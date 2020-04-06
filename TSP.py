@@ -12,17 +12,9 @@ import geopy
 from geopy.geocoders import Nominatim
 from geopy.extra.rate_limiter import RateLimiter
 
-address = []
+address = ['דב האוזנר 3, תל אביב יפו', 'איזק שטרן 11, תל אביב', 'שדרות לוי אשכול 54, תל אביב']
 
-s1 = 'דב האוזנר 3, תל אביב יפו'
-s2 = 'איזק שטרן 11, תל אביב'
-s3 = 'שדרות לוי אשכול 54, תל אביב'
-
-address.append(s1)
-address.append(s3)
-address.append(s2)
-
-
+# Translate address(written in English\Hebrew) to lat,lon cordinates.
 def addressToLocations(address):
     locations = []
     locator = Nominatim(user_agent="myGeocoder")
@@ -34,6 +26,8 @@ def addressToLocations(address):
 
     return locations
 
+
+# Calculating the distances array betwenen all pairs of locations using NetworKX and OSMnx libraries
 def calculate_distances_array(locations):
     n = len(locations)
     distances_array = [[0 for i in range(n)] for j in range(n)]
@@ -45,25 +39,27 @@ def calculate_distances_array(locations):
                 l = tuple(map(operator.add, locations[i], locations[j]))
                 l = (l[0]/2,l[1]/2)
 
+                # Great circle distance between two points
                 # vincenity: lat,lon
-
                 dist = distance.distance((locations[i][0], locations[i][1]),
                     (locations[j][0], locations[j][1])).meters + 300
 
                 graph = ox.graph_from_point(l,dist)
 
+                # Finfing the nearest node to each one of the locations
                 orig_node = ox.get_nearest_node(graph, locations[i])
                 dest_node = ox.get_nearest_node(graph, locations[j])
 
+                # Finding the shortest path between location i to j and from j to i (with metric = length)
                 route_ij = nx.shortest_path_length(graph, source=orig_node, target=dest_node, weight='length')
                 route_ji = nx.shortest_path_length(graph, source=dest_node, target=orig_node, weight='length')
 
                 distances_array[i][j] = route_ij
                 distances_array[j][i] = route_ji
-
     return distances_array
 
-def TSP(distances_array):
+
+def DP_TSP(distances_array):
     n = len(distances_array)
     all_points_set = set(range(n))
 
@@ -113,24 +109,26 @@ def retrace_optimal_path(memo: dict, n: int) -> [[int], float]:
 
     return optimal_path, optimal_cost
 
+
 def mergeNplot(optimal_path,locations):
-    lat = 0
-    lon = 0
+    lat = lon = 0
+    # Finding the center of all locations, it's purpose is for generating the map
     for location in locations:
-        print(location)
         lat += location[0]
         lon += location[1]
     lat = lat/len(locations)
     lon = lon/len(locations)
     mid_point = (lat,lon)
+
+    # Calculating the distace from each location to mid_point
     distances = [distance.distance(x,mid_point).meters for x in locations]
     dist = max(distances) + 200
 
-    print("start merge")
+    #Generating the graph
     graph = ox.graph_from_point(mid_point,dist)
-    graph_map = ox.plot_graph_folium(graph, popup_attribute='name', edge_width=2)
+    graph_map = ox.plot_graph_folium(graph, popup_attribute='name', edge_width=0)
 
-    print("finish graph")
+    # Generating the route according to the optimal order of the locations
     routes = []
     for i in range(len(optimal_path)-1):
         l1 = locations[optimal_path[i]]
@@ -142,14 +140,14 @@ def mergeNplot(optimal_path,locations):
         route_graph_map = ox.plot_route_folium(graph, route, route_map=graph_map)
         routes.append(route)
 
-    print("finish routes")
+    # Markers addition on the places locations.
     i = 0
     for location in optimal_path:
-        folium.Marker(location=locations[location],popup=i,icon=folium.Icon(color='blue', icon=i)).add_to(graph_map)
+        folium.Marker(location=locations[location],popup=i,icon=folium.Icon(color='blue')).add_to(graph_map)
         i+=1
 
 
-    graph_map.save('graph.html')
+    graph_map.save('tsp_graph.html')
 
 
 
